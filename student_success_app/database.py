@@ -15,21 +15,26 @@ from supabase import create_client, Client
 class Database:
     """Supabase database manager for SDPS"""
     
-    def __init__(self, supabase_url: str = None, supabase_key: str = None):
-        """Initialize Supabase client"""
+def __init__(self, supabase_url: str = None, supabase_key: str = None):
+    """Initialize Supabase client"""
+    
+    # Safely try Streamlit secrets first (for Cloud), then env vars (for local)
+    try:
+        self.supabase_url = supabase_url or st.secrets["SUPABASE_URL"]
+        self.supabase_key = supabase_key or st.secrets["SUPABASE_KEY"] or st.secrets["SUPABASE_ANON_KEY"]
+    except Exception:
+        # Fallback to local environment variables
+        self.supabase_url = supabase_url or os.getenv("SUPABASE_URL")
+        self.supabase_key = supabase_key or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
         
-        # Try Streamlit secrets first (for Cloud), then env vars (for local)
-        self.supabase_url = supabase_url or st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
-        self.supabase_key = supabase_key or st.secrets.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
-        
-        if not self.supabase_url or not self.supabase_key:
-            raise ValueError(
-                "Supabase URL and Key must be provided. "
-                "Set SUPABASE_URL and SUPABASE_KEY in secrets or environment variables."
-            )
-        
-        self.client: Client = create_client(self.supabase_url, self.supabase_key)
-        print(f"Supabase connected: {self.supabase_url}")
+    if not self.supabase_url or not self.supabase_key:
+        raise ValueError(
+            "Supabase URL and Key must be provided. "
+            "Set SUPABASE_URL and SUPABASE_KEY in .env or Streamlit secrets."
+        )
+    
+    self.client: Client = create_client(self.supabase_url, self.supabase_key)
+    print(f"Supabase connected: {self.supabase_url}")
     
     # Return (success, error_message)
     def _handle_error(self, error) -> str:
