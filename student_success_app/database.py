@@ -7,7 +7,9 @@ import os
 from datetime import datetime
 from typing import Optional, List, Dict
 import bcrypt
+import streamlit as st
 from supabase import create_client, Client
+
 
 
 class Database:
@@ -15,13 +17,15 @@ class Database:
     
     def __init__(self, supabase_url: str = None, supabase_key: str = None):
         """Initialize Supabase client"""
-        self.supabase_url = supabase_url or os.getenv("SUPABASE_URL")
-        self.supabase_key = supabase_key or os.getenv("SUPABASE_ANON_KEY")
+        
+        # Try Streamlit secrets first (for Cloud), then env vars (for local)
+        self.supabase_url = supabase_url or st.secrets.get("SUPABASE_URL") or os.getenv("SUPABASE_URL")
+        self.supabase_key = supabase_key or st.secrets.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
         
         if not self.supabase_url or not self.supabase_key:
             raise ValueError(
                 "Supabase URL and Key must be provided. "
-                "Set SUPABASE_URL and SUPABASE_ANON_KEY environment variables."
+                "Set SUPABASE_URL and SUPABASE_KEY in secrets or environment variables."
             )
         
         self.client: Client = create_client(self.supabase_url, self.supabase_key)
