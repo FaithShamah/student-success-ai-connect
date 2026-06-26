@@ -7,34 +7,33 @@ import os
 from datetime import datetime
 from typing import Optional, List, Dict
 import bcrypt
-import streamlit as st
 from supabase import create_client, Client
-
 
 
 class Database:
     """Supabase database manager for SDPS"""
     
-def __init__(self, supabase_url: str = None, supabase_key: str = None):
-    """Initialize Supabase client"""
-    
-    # Safely try Streamlit secrets first (for Cloud), then env vars (for local)
-    try:
-        self.supabase_url = supabase_url or st.secrets["SUPABASE_URL"]
-        self.supabase_key = supabase_key or st.secrets["SUPABASE_KEY"] or st.secrets["SUPABASE_ANON_KEY"]
-    except Exception:
-        # Fallback to local environment variables
-        self.supabase_url = supabase_url or os.getenv("SUPABASE_URL")
-        self.supabase_key = supabase_key or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+    def __init__(self, supabase_url: str = None, supabase_key: str = None):
+        """Initialize Supabase client"""
+        import streamlit as st
         
-    if not self.supabase_url or not self.supabase_key:
-        raise ValueError(
-            "Supabase URL and Key must be provided. "
-            "Set SUPABASE_URL and SUPABASE_KEY in .env or Streamlit secrets."
-        )
-    
-    self.client: Client = create_client(self.supabase_url, self.supabase_key)
-    print(f"Supabase connected: {self.supabase_url}")
+        # Safely try Streamlit secrets first (for Cloud), then env vars (for local)
+        try:
+            self.supabase_url = supabase_url or st.secrets["SUPABASE_URL"]
+            self.supabase_key = supabase_key or st.secrets["SUPABASE_KEY"] or st.secrets["SUPABASE_ANON_KEY"]
+        except Exception:
+            # Fallback to local environment variables
+            self.supabase_url = supabase_url or os.getenv("SUPABASE_URL")
+            self.supabase_key = supabase_key or os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+        
+        if not self.supabase_url or not self.supabase_key:
+            raise ValueError(
+                "Supabase URL and Key must be provided. "
+                "Set SUPABASE_URL and SUPABASE_KEY in .env or Streamlit secrets."
+            )
+        
+        self.client: Client = create_client(self.supabase_url, self.supabase_key)
+        print(f"Supabase connected: {self.supabase_url}")
     
     # Return (success, error_message)
     def _handle_error(self, error) -> str:
@@ -136,12 +135,6 @@ def __init__(self, supabase_url: str = None, supabase_key: str = None):
         except Exception as e:
             self._handle_error(e)
             return None
-
-    def get_current_profile(self, username: str, account_type: str) -> Optional[Dict]:
-        """Helper to get profile dynamically based on account type"""
-        if account_type == 'user':
-            return self.get_user_profile(username)
-        return self.get_admin_profile(username)
     
     def update_admin_profile(
         self, 
@@ -239,6 +232,10 @@ def __init__(self, supabase_url: str = None, supabase_key: str = None):
             self._handle_error(e)
             return False
 
+    # ============================================================================
+    # USER AUTHENTICATION METHODS
+    # ============================================================================
+
     def create_user(
         self,
         username: str,
@@ -323,31 +320,6 @@ def __init__(self, supabase_url: str = None, supabase_key: str = None):
         except Exception as e:
             self._handle_error(e)
             return None
-
-    def change_user_password(
-        self,
-        username: str,
-        old_password: str,
-        new_password: str
-    ) -> tuple[bool, str]:
-        """Change a regular user's password."""
-        verified, _ = self.verify_user(username, old_password)
-        if not verified:
-            return False, "Current password is incorrect"
-
-        try:
-            new_hash = bcrypt.hashpw(
-                new_password.encode('utf-8'),
-                bcrypt.gensalt()
-            ).decode('utf-8')
-
-            response = self.client.table('users').update({
-                'password_hash': new_hash
-            }).eq('username', username).execute()
-
-            return (len(response.data) > 0), "Password updated successfully" if response.data else "Could not update password."
-        except Exception as e:
-            return False, self._handle_error(e) or "Could not update password."
 
     def get_current_profile(self, username: str, account_type: str) -> Optional[Dict]:
         """Return the current admin or user profile."""
@@ -439,6 +411,31 @@ def __init__(self, supabase_url: str = None, supabase_key: str = None):
             return True, "Password reset successfully."
         except Exception as e:
             return False, self._handle_error(e)
+
+    def change_user_password(
+        self,
+        username: str,
+        old_password: str,
+        new_password: str
+    ) -> tuple[bool, str]:
+        """Change a regular user's password."""
+        verified, _ = self.verify_user(username, old_password)
+        if not verified:
+            return False, "Current password is incorrect"
+
+        try:
+            new_hash = bcrypt.hashpw(
+                new_password.encode('utf-8'),
+                bcrypt.gensalt()
+            ).decode('utf-8')
+
+            response = self.client.table('users').update({
+                'password_hash': new_hash
+            }).eq('username', username).execute()
+
+            return (len(response.data) > 0), "Password updated successfully" if response.data else "Could not update password."
+        except Exception as e:
+            return False, self._handle_error(e) or "Could not update password."
 
     def get_all_users(self) -> List[Dict]:
         """Get all regular users for admin dashboard."""
